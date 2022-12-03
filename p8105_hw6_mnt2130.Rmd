@@ -101,25 +101,34 @@ The following code chunk creates a city_state variable and a binary variable whi
 
 ```{r homicide}
 
-homicide_df =
-  read_csv("./data/homicide-data.csv") %>%
+homicide_df = 
+  read_csv("./data/homicide-data.csv", na = c("", "NA", "Unknown")) %>% 
   mutate(
     city_state = str_c(city, state, sep = "_"),
-    resolved = case_when(
-      disposition == "Closed without arrest" ~ "unsolved",
-      disposition == "Open/No arrest"        ~ "unsolved",
-      disposition == "Closed by arrest"      ~ "solved"
+    resolution = case_when(
+      disposition == "Closed without arrest" ~ 0,
+      disposition == "Open/No arrest"        ~ 0,
+      disposition == "Closed by arrest"      ~ 1,
     ),
-    resolved = forcats::fct_relevel(resolved, "unsolved"),
-    victim_age = as.numeric(victim_age),
-    victim_sex = as.factor(victim_sex)
-  ) %>%
-  select(-city,-state,-victim_last,-victim_first,-lon,-lat) %>%
-  filter(
-    !str_detect(city_state, "Tulsa|Dallas|Phoenix|Kansas"),
-    victim_race %in% c("White", "Black"),
-    victim_sex %in% c("Male", "Female")
-  ) %>%
-  nest(c(-city_state))
+    victim_age = as.numeric(victim_age)
+  ) %>% 
+  filter(!city_state %in% c("Tulsa_AL", "Dallas_TX", "Phoenix_AZ","Kansas City_MO"))  %>% 
+  filter(victim_race %in% c("Black", "White")) %>% 
+  filter(victim_sex %in% c("Male", "Female")) %>%  
+  select(city_state, resolution, victim_age, victim_race, victim_sex)
+```
+```{r baltimore}
+baltimore_logitstic = homicide_df %>% 
+  filter(city_state == "Baltimore_MD") %>% 
+glm(resolution ~ victim_age + victim_sex + victim_race, family = binomial() , data = .) %>%
+  broom::tidy() %>% 
+  mutate(
+    odds_ratio = exp(estimate),
+    ci_lower =  exp(estimate - 1.96 * std.error),
+    ci_upper = exp(estimate + 1.96 * std.error)
+  ) %>% 
+  select(term, odds_ratio, starts_with("CI")) %>% 
+  knitr::kable(digits = 3)
+baltimore_logitstic
 ```
 
