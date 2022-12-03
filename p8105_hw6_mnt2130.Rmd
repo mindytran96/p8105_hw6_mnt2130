@@ -8,6 +8,10 @@ output: github_document
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(viridis)
+library(patchwork)
+library(dplyr)
+library(modelr)
+library(mgcv)
 
 knitr::opts_chunk$set(
 	echo = TRUE,
@@ -92,4 +96,30 @@ weather_df %>%
 
 As with $r^2$, this distribution is approximately normally distributed but also somewhat skewed and potentially has some outliers. 
 
+### Problem 2
+The following code chunk creates a city_state variable and a binary variable which indicates whether a homicide is resolved. It also omits the cities : Tulsa, Dallas, Phoenix, and Kansas which have missing data or data entry mistakes. We also limited our analyses to victims who were white or black and converted the variable victim_age to a numeric variable.
+
+```{r homicide}
+
+homicide_df =
+  read_csv("./data/homicide-data.csv") %>%
+  mutate(
+    city_state = str_c(city, state, sep = "_"),
+    resolved = case_when(
+      disposition == "Closed without arrest" ~ "unsolved",
+      disposition == "Open/No arrest"        ~ "unsolved",
+      disposition == "Closed by arrest"      ~ "solved"
+    ),
+    resolved = forcats::fct_relevel(resolved, "unsolved"),
+    victim_age = as.numeric(victim_age),
+    victim_sex = as.factor(victim_sex)
+  ) %>%
+  select(-city,-state,-victim_last,-victim_first,-lon,-lat) %>%
+  filter(
+    !str_detect(city_state, "Tulsa|Dallas|Phoenix|Kansas"),
+    victim_race %in% c("White", "Black"),
+    victim_sex %in% c("Male", "Female")
+  ) %>%
+  nest(c(-city_state))
+```
 
