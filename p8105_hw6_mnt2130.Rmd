@@ -277,5 +277,19 @@ lin_fit %>%
   knitr::kable(digits = 3)
 ```
 
+The following code plots residuals vs. fitted values of the initial model
 
+```{r}
+baby_df %>%  
+  add_residuals(lin_fit) %>% 
+  add_predictions(lin_fit) %>% 
+  ggplot(aes(x = pred, y = resid)) + 
+  geom_point(alpha = .2) + 
+  geom_smooth(se = F) + 
+  labs(
+    title = "Fitted Values Vs. Residuals (Initial Model)",
+    x = "Model Predicted Birthweight",
+    y = "Model Residuals"
+  )
+```
 
