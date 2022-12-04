@@ -117,8 +117,9 @@ homicide_df =
   filter(victim_sex %in% c("Male", "Female")) %>%  
   select(city_state, resolution, victim_age, victim_race, victim_sex)
 ```
+The code below fits a logistic regression of resolved vs unresolved cases as the outcome and the age,sex, and race of the victims as predictors for the city of Baltimore and gives the adjusted odds ratio for solving homicides comparing male victims to female victims keeping all other variables fixed.
 ```{r baltimore}
-baltimore_logitstic = homicide_df %>% 
+baltimore_logistic = homicide_df %>% 
   filter(city_state == "Baltimore_MD") %>% 
 glm(resolution ~ victim_age + victim_sex + victim_race, family = binomial() , data = .) %>%
   broom::tidy() %>% 
@@ -129,6 +130,49 @@ glm(resolution ~ victim_age + victim_sex + victim_race, family = binomial() , da
   ) %>% 
   select(term, odds_ratio, starts_with("CI")) %>% 
   knitr::kable(digits = 3)
-baltimore_logitstic
+baltimore_logistic
 ```
+The odds of a solved homicide for male victims is 0.426 (CI: 0.325, 0.558) times the odds of a solved homocide for female victims, controlling for age and race (White or Black). 
+
+The code below fits a logistic regression of resolved vs unresolved cases as the outcome and the age,sex, and race of the victims as predictors for all cities in the dataset besides the 4 that we excluded in the data cleaning step. 
+
+```{r all_cities}
+models_results = homicide_df %>% 
+  nest(data = -city_state) %>% 
+  mutate(
+    models = map(.x = data, ~ glm(resolution ~ victim_age + victim_sex + victim_race, data = .x, family = binomial())),
+    results = map(models, broom::tidy)
+  ) %>% 
+  select(city_state, results) %>% 
+  unnest(results) %>% 
+  mutate(
+    odds_ratio = exp(estimate),
+    ci_lower =  exp(estimate - 1.96 * std.error),
+    ci_upper = exp(estimate + 1.96 * std.error)
+  ) %>% 
+  select(term, odds_ratio, starts_with("CI"))
+```
+The code below create a plot that shows the estimated ORs and CIs for each city and organizes the cities according to estimated OR in ascending order. 
+
+```{r plot, fig.width=8}
+models_results %>% 
+  filter(term == "victim_sexMale") %>% 
+  mutate(city_state = fct_reorder(city_state, odds_ratio)) %>% 
+  ggplot(aes(x = city_state, y = odds_ratio)) + 
+  geom_point() + 
+  geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper)) +
+ theme(axis.text.x = element_text(angle = 60, vjust = 1.0, hjust = 1), legend.position = "none") + 
+ geom_hline(yintercept=1, linetype="dashed", color = "red", linewidth=0.5) +
+  labs(
+    title = "Odds Ratio of Homicide Case Resolution Status by City",
+    subtitle  = "The odds ratio of case resolution comparing male victims to female victims, controlling for age & sex",
+    y = "Odds Ratio",
+    x = "City-States"
+  )  
+```
+
+New York, NY has the lowest odds ratio of case resolution comparing male victims to female victims when controlling for age and sex. Alberqurque, NM has the highest odds ratio of case resolution when comparing male victims to female victims when controlling for age and sex, it also has the widest confidence interval indicating less reliability when interpreting this odds ratio estimate. 
+
+
+
 
