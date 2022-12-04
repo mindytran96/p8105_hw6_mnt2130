@@ -328,4 +328,86 @@ cv_df = cv_df %>%
     ) 
 ```
 
+Now, we create cross validation datasets, by splitting the original sample into 80% for training and 20% for testing, and creating 100 resample objects. 
 
+```{r, warning=F, message=F}
+cv_df = 
+  crossv_mc(baby_df, 100)
+#Convert the resample objects into a tibble
+cv_df = cv_df %>% 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble) 
+    ) 
+```
+Then, we can fit the 3 models to be compared on the training datasets and compute the RMSE values of the corresponding models using the code chunk below:
+```{r}
+cv_df = cv_df %>% 
+  mutate(
+    initial_model = map(.x = train, ~lm(bwt ~ delwt + mheight + momage, data = .x)),
+    main_model = map(.x = train, ~ lm(bwt ~ blength + gaweeks, data = .x)),
+    interact_model = map(.x = train, ~ lm(bwt ~ bhead + blength + babysex + bhead*blength*babysex, data = .x))
+  ) %>% 
+  mutate(
+    rmse_initial_model = map2_dbl(.x = initial_model, .y = test, ~rmse(model = .x, data =.y)),
+    rmse_main_model = map2_dbl(.x = main_model, .y = test, ~rmse(model = .x, data =.y)),
+    rmse_interact_model = map2_dbl(.x = interact_model, .y = test, ~rmse(model = .x, data =.y))
+  ) 
+```
+
+Now, we can compare the three RMSE values from the 3 models built
+```{r, message=F, fig.width=8}
+#tidy the cross_validation dataframe first
+rmse_df = cv_df %>% 
+  select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model",
+    values_to = "rmse",
+    names_prefix =  "rmse_"
+  ) 
+
+rmse_df %>% 
+  group_by(model) %>% 
+  summarize(
+    mean_rmse = mean(rmse)
+  ) %>% 
+  knitr::kable()
+
+rmse_df %>% 
+  ggplot(aes(x = model, y =rmse, fill = model)) + 
+  geom_violin(alpha = .5) + 
+  geom_boxplot(alpha = .9) +
+  labs(
+    title = "Comparing RMSEs of the 3 models",
+    y = "Root Mean Squred Error",
+    x = "Models"
+  )
+```
+
+Comparing RMSEs, the interact_model with the 3 way interaction term appears to be the best model to predict birthweight. 
+
+Now we can fit the best model and plot the residuals vs predicted values. 
+```{r}
+best_model =
+  baby_df %>% 
+  lm(bwt ~ bhead + blength + babysex + bhead*blength*babysex, data = .)
+best_model %>%
+  broom::tidy() %>% 
+  knitr::kable()
+```
+
+```{r, message=F, warning=F}
+baby_df %>%  
+  add_residuals(best_model) %>% 
+  add_predictions(best_model) %>% 
+  ggplot(aes(x = pred, y = resid)) + 
+  geom_point(alpha = .2) + 
+  geom_smooth(se = F) + 
+  labs(
+    title = "Fitted Values Vs. Residuals (Interact_Model)",
+    x = "Model Predicted Birthweight",
+    y = "Model Residuals"
+  )
+```
+The residuals appear to have a uniform distribution judging by the plot generated. 
