@@ -8,10 +8,13 @@ output: github_document
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(viridis)
+library(readr)
+library(purrr)
 library(patchwork)
 library(dplyr)
 library(modelr)
 library(mgcv)
+library (knitr)
 
 knitr::opts_chunk$set(
 	echo = TRUE,
@@ -162,7 +165,7 @@ models_results %>%
   geom_point() + 
   geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper)) +
  theme(axis.text.x = element_text(angle = 60, vjust = 1.0, hjust = 1), legend.position = "none") + 
- geom_hline(yintercept=1, linetype="dashed", color = "red", linewidth=0.5) +
+ geom_hline(yintercept = 1, linetype="dashed", color = "red", linewidth = 0.5) +
   labs(
     title = "Odds Ratio of Homicide Case Resolution Status by City",
     subtitle  = "The odds ratio of case resolution comparing male victims to female victims, controlling for age & sex",
@@ -276,6 +279,7 @@ lin_fit %>%
   broom::tidy() %>% 
   knitr::kable(digits = 3)
 ```
+The model has an adjusted r-squared value of 0.1, indicating that 10% of the variation in birth weight is explained by mother's weight, age, and height. 
 
 The following code plots residuals vs. fitted values of the initial model
 
@@ -292,4 +296,36 @@ baby_df %>%
     y = "Model Residuals"
   )
 ```
+Based on the plot, the model seems uniformly distributed indicating that the variance of the errors is constant. However, there seems to be a curved trend in the model residuals in comparison to the birthweight, indicating that the model might have some shortcomings when trying to predict birthweight from our predictor variables. 
+
+
+## Building two additional models 
+Model 2 uses baby's birth weight as the outcome with birth length and gestational age as predictors 
+
+Model 3 uses head circumference, length, sex, and an interaction term between the three predictors. 
+
+```{r}
+#model 2 -
+baby_df %>% 
+lm(bwt ~ blength + gaweeks, data = .) %>% 
+  broom::tidy() %>% 
+  knitr::kable(digits = 3)
+#model 3 - 
+baby_df %>% 
+  lm(bwt ~ bhead + blength + babysex + bhead*blength*babysex, data = .) %>% 
+  broom::tidy() %>% 
+  knitr::kable(digits = 3)
+```
+This code chunk creates cross validation datasets, by splitting the original sample into 80% for training and 20% for testing, and creating 100 resample objects. 
+```{r, warning=F, message=F}
+cv_df = 
+  crossv_mc(baby_df, 100)
+#Convert the resample objects into a tibble
+cv_df = cv_df %>% 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble) 
+    ) 
+```
+
 
